@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using Photon.Pun;
 using TMPro;
@@ -9,6 +8,7 @@ public class Health : MonoBehaviour
 {
     public int health;
     public bool isLocalPlayer;
+    private bool hasDied;
 
     [Header("UI")]
     public TextMeshProUGUI healthText;
@@ -24,9 +24,20 @@ public class Health : MonoBehaviour
     public float redFlashDuration = 0.3f; // Duration of the red flash
     public Color flashColor = new Color(1f, 0f, 0f, 0.5f); // Red color with transparency
 
+    void Update()
+    {
+        // Test for damage by pressing the 'T' key
+        if (isLocalPlayer && Input.GetKeyDown(KeyCode.P))
+        {
+            TakeDamage(30); // Take 10 damage when 'T' is pressed
+        }
+    }
+
     [PunRPC]
     public void TakeDamage(int _damage)
     {
+        if(hasDied) return;
+
         health -= _damage;
 
         // Update health UI
@@ -46,22 +57,23 @@ public class Health : MonoBehaviour
         {
             if (isLocalPlayer)
             {
+                hasDied = true;
                 // Check if RoomManager exists before trying to respawn
                 if (RoomManager.instance != null)
-                {   
-                    RoomManager.instance.OnPlayerDeath();
-                    RoomManager.instance.SpawnPlayer();
+                {
+                    RoomManager.instance.OnPlayerDeath(); // Open the respawn screen
                     RoomManager.instance.deaths++;
                     RoomManager.instance.SetHashes();
                 }
                 else
                 {
-                    Debug.LogError("RoomManager instance is null. Cannot respawn the player.");
+                    Debug.LogError("RoomManager instance is null. Cannot open respawn screen.");
                 }
             }
 
-            // Destroy the gameObject after the respawn process
-            Destroy(gameObject);
+            // Destroy the gameObject after the player dies
+            //Destroy(gameObject);
+            PhotonNetwork.Destroy(gameObject);
         }
     }
 

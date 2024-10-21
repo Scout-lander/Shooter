@@ -1,10 +1,13 @@
 using System.Collections;
 using System.Collections.Generic;
+using Photon.Pun;
 using Unity.VisualScripting;
 using UnityEngine;
 
 public class WeaponSwitcher : MonoBehaviour
 {
+
+    public PhotonView playerSetupView;
     private int selectedWeapon = 0;
     private int totalWeapons;
 
@@ -57,6 +60,7 @@ public class WeaponSwitcher : MonoBehaviour
 
     void SelectWeapon()
     {
+        playerSetupView.RPC("SetTPWeapon", RpcTarget.All, selectedWeapon);
         int i = 0;
 
         foreach (Transform weapon in transform)

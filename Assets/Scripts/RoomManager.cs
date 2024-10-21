@@ -18,10 +18,12 @@ public class RoomManager : MonoBehaviourPunCallbacks
     [Space]
     public GameObject nameUI;
     public GameObject connectingUI;
+    public GameObject respawnScreen; // Reference to the respawn screen UI
 
     [Header("UI Elements")]
     public TMP_InputField nicknameInputField; // Reference to the TMP_InputField for nickname
     public Button joinRoomButton; // Reference to the button for joining the room
+    public Button respawnButton; // Reference to the button for respawning
 
     [HideInInspector]
     public int kills = 0;
@@ -49,17 +51,40 @@ public class RoomManager : MonoBehaviourPunCallbacks
     {
         // Add a listener for the button click
         joinRoomButton.onClick.AddListener(JoinRoomButtonPressed);
+        respawnButton.onClick.AddListener(RespawnPlayer); // Add respawn button listener
 
         // Start with the name UI active and the connecting UI hidden
         nameUI.SetActive(true);
         connectingUI.SetActive(false);
+        respawnScreen.SetActive(false); // Start with the respawn screen hidden
     }
+
     public void OnPlayerDeath()
     {
         // Reset spawn flag on death
         hasSpawnedPlayer = false;
 
-        // Handle respawn logic here
+        // Show the respawn screen
+        respawnScreen.SetActive(true);
+        roomCam.SetActive(true);
+
+        // Enable and show the mouse cursor
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
+
+    public void RespawnPlayer()
+    {
+        // Hide the respawn screen when respawning
+        respawnScreen.SetActive(false);
+        roomCam.SetActive(false);
+
+        // Lock and hide the mouse cursor after respawn
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+
+        // Respawn the player
+        SpawnPlayer();
     }
 
     // Method to set the room name when a room button is pressed
@@ -149,7 +174,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
         SpawnPlayer();
     }
 
-    public void SpawnPlayer()
+     public void SpawnPlayer()
     {
         if (hasSpawnedPlayer)
         {
