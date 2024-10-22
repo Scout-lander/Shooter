@@ -35,6 +35,7 @@ public class Weapon : MonoBehaviour, IWeapon
     public int mag = 5;
     public int ammo = 30;
     public int magAmmo = 30;
+    public int lowAmmoThreshold = 5; // Threshold for low ammo warning
 
     [Header("UI")]
     public TextMeshProUGUI magText;
@@ -67,6 +68,7 @@ public class Weapon : MonoBehaviour, IWeapon
     public float recoilResetTime = 0.5f; // Time after which recoil resets
     private int currentRecoilIndex = 0;
     private float recoilTimer;
+    public float recoilRandomFactor = 0.1f; // Adds randomness to recoil
 
     [Header("Randomized Spread Settings")]
     public float baseSpread = 0.01f; // Base spread angle
@@ -147,6 +149,19 @@ public class Weapon : MonoBehaviour, IWeapon
         }
 
         HandleADS(); // Call ADS logic
+        HandleLowAmmoWarning(); // Update ammo UI warning when ammo is low
+    }
+    // Low ammo UI update
+    void HandleLowAmmoWarning()
+    {
+        if (ammo <= lowAmmoThreshold)
+        {
+            ammoText.color = Color.red; // Set ammo text to red
+        }
+        else
+        {
+            ammoText.color = Color.white; // Reset ammo text to white
+        }
     }
 
     void HandleADS()
@@ -254,9 +269,9 @@ public class Weapon : MonoBehaviour, IWeapon
             yield return new WaitForSeconds(burstFireRate);
         }
 
-        // Set isFiring to false after the burst finishes
+        // Reset isFiring and allow another burst immediately
         isFiring = false;
-
+        nextFire = fireRate; // After the burst ends, apply standard fire rate cooldown
         burstCoroutine = null;
     }
 
@@ -294,11 +309,11 @@ public class Weapon : MonoBehaviour, IWeapon
         GameObject flashInstance = Instantiate(muzzleFlash, muzzleTransform.position, muzzleTransform.rotation);
         Destroy(flashInstance, muzzleFlashDuration);
 
-        // Calculate recoil
+        // Calculate recoil with randomness
         Vector2 recoilOffset = Vector2.zero;
         if (currentRecoilIndex < recoilPattern.Length)
         {
-            recoilOffset = recoilPattern[currentRecoilIndex];
+            recoilOffset = recoilPattern[currentRecoilIndex] + new Vector2(Random.Range(-recoilRandomFactor, recoilRandomFactor), Random.Range(-recoilRandomFactor, recoilRandomFactor));
             currentRecoilIndex++;
         }
 
@@ -314,33 +329,29 @@ public class Weapon : MonoBehaviour, IWeapon
         camera.transform.localRotation *= Quaternion.Euler(-recoilOffset.y, recoilOffset.x, 0);
 
         Ray ray = new Ray(camera.transform.position, fireDirection);
-    RaycastHit hit;
+        RaycastHit hit;
 
-    if (Physics.Raycast(ray, out hit, 100f))
-    {
-        PhotonNetwork.Instantiate(hitVFX.name, hit.point, Quaternion.identity);
-
-        Health targetHealth = hit.transform.gameObject.GetComponent<Health>();
-        if (targetHealth != null) // Ensure the hit object has a Health component
+        if (Physics.Raycast(ray, out hit, 100f))
         {
-            // Calculate the new health after applying damage
-            int remainingHealth = targetHealth.health - damage;
+            PhotonNetwork.Instantiate(hitVFX.name, hit.point, Quaternion.identity);
 
-            // Call the RPC to apply damage on all clients
-            hit.transform.gameObject.GetComponent<PhotonView>().RPC("TakeDamage", RpcTarget.All, damage);
-
-            // Check if the damage will result in the target's death
-            if (remainingHealth <= 0)
+            Health targetHealth = hit.transform.gameObject.GetComponent<Health>();
+            if (targetHealth != null) // Ensure the hit object has a Health component
             {
-                RoomManager.instance.kills++;
-                RoomManager.instance.SetHashes();
+                int remainingHealth = targetHealth.health - damage;
+
+                hit.transform.gameObject.GetComponent<PhotonView>().RPC("TakeDamage", RpcTarget.All, damage);
+
+                if (remainingHealth <= 0)
+                {
+                    RoomManager.instance.kills++;
+                    RoomManager.instance.SetHashes();
+                }
             }
         }
-    }
 
         // Increase spread
         currentSpread = Mathf.Min(currentSpread + spreadIncreasePerShot, maxSpread);
-
 
         // Reset recoil timer
         recoilTimer = recoilResetTime;

@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e8e04b0ad4fcad49ba1139400d5b4fa, type: 3}
+  m_Name: RougePlayer
+  m_EditorClassIdentifier: 
+  className: RougePlayer
+  walkSpeed: 5
+  sprintSpeed: 8
+  crouchSpeed: 4
+  jumpHeight: 1
+  slideSpeed: 7
+  staminaUseRate: 20
+  staminaRegenRate: 10
+  skills:
+  - skillName: fireball
+    cooldownTime: 0
+    skillEffectPrefab: {fileID: 1206498299807332555, guid: af6c1e3f046eecd4d81330aeb285600f, type: 3}
+    manaCost: 0

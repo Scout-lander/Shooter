@@ -24,6 +24,11 @@ public class RoomManager : MonoBehaviourPunCallbacks
     public TMP_InputField nicknameInputField; // Reference to the TMP_InputField for nickname
     public Button joinRoomButton; // Reference to the button for joining the room
     public Button respawnButton; // Reference to the button for respawning
+    [Header("Class Selection")]
+    public GameObject classButtonPrefab; // Prefab for the class selection button
+    public Transform classButtonContainer; // Where to spawn the class buttons
+    public GameObject[] classPrefabs;  // Array to hold different class prefabs
+    private int selectedClassIndex = -1;
 
     [HideInInspector]
     public int kills = 0;
@@ -57,6 +62,41 @@ public class RoomManager : MonoBehaviourPunCallbacks
         nameUI.SetActive(true);
         connectingUI.SetActive(false);
         respawnScreen.SetActive(false); // Start with the respawn screen hidden
+
+        // Generate class selection buttons on the name UI
+        GenerateClassButtons();
+    }
+
+    // Generates buttons for each class on the name UI
+    private void GenerateClassButtons()
+    {
+        // Clear any existing buttons
+        foreach (Transform child in classButtonContainer)
+        {
+            Destroy(child.gameObject);
+        }
+
+        // Create a button for each class prefab
+        for (int i = 0; i < classPrefabs.Length; i++)
+        {
+            int index = i;  // Local copy of the index for the button's listener
+
+            // Instantiate a button for each class
+            GameObject button = Instantiate(classButtonPrefab, classButtonContainer);
+
+            // Set the button text to the class name
+            TMP_Text buttonText = button.GetComponentInChildren<TMP_Text>();
+            buttonText.text = classPrefabs[i].name;
+
+            // Add a listener to select the class when the button is clicked
+            button.GetComponent<Button>().onClick.AddListener(() => SelectClass(index));
+        }
+    }
+    // Method to handle class selection
+    public void SelectClass(int classIndex)
+    {
+        selectedClassIndex = classIndex;  // Store the selected class index
+        Debug.Log($"Class {classPrefabs[classIndex].name} selected.");
     }
 
     public void OnPlayerDeath()
@@ -106,17 +146,25 @@ public class RoomManager : MonoBehaviourPunCallbacks
             nickname = "Unnamed"; // Fallback to default nickname
         }
 
+        // Ensure that a class has been selected
+        if (selectedClassIndex == -1)
+        {
+            Debug.LogError("No class selected. Please select a class before joining.");
+            return;
+        }
+
         Debug.Log("Connecting...");
 
-        // Check if we're already connected to Photon to avoid reconnecting
-        if (PhotonNetwork.IsConnected)
+        // Check if Photon is connected and ready for operations
+        if (PhotonNetwork.IsConnected && PhotonNetwork.InLobby)
         {
             JoinRoom();
         }
         else
         {
-            // Connect to the Photon server using the settings
+            // Connect to the Photon server
             PhotonNetwork.ConnectUsingSettings();
+            // The actual joining will happen in the OnConnectedToMaster or OnJoinedLobby callbacks
         }
 
         // Hide the name UI and show the connecting UI
@@ -190,9 +238,10 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
         // Choose a random spawn point from the available ones
         Transform spawnPoint = spawnPoints[UnityEngine.Random.Range(0, spawnPoints.Length)];
+        GameObject classPrefab = classPrefabs[selectedClassIndex];
 
         // Instantiate the player object at the chosen spawn point
-        GameObject _player = PhotonNetwork.Instantiate(player.name, spawnPoint.position, Quaternion.identity);
+        GameObject _player = PhotonNetwork.Instantiate(classPrefabs[selectedClassIndex].name, spawnPoint.position, Quaternion.identity);
 
         // Set up the player if the PlayerSetup script exists
         PlayerSetup playerSetup = _player.GetComponent<PlayerSetup>();
