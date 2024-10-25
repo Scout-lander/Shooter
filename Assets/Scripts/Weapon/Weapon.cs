@@ -12,6 +12,7 @@ public class Weapon : MonoBehaviour, IWeapon
     public Camera camera;
     public int damage;
     public float fireRate = 0.3f; // Time between shots in seconds for auto fire
+    public WeaponIKHandler ikHandler; // Reference to the new IK handling scrip
 
     private float nextFire;
 
@@ -55,13 +56,15 @@ public class Weapon : MonoBehaviour, IWeapon
     private Coroutine burstCoroutine; // To handle burst fire
 
     [Header("ADS Settings")]
-    public GameObject adsObject; // The object you want to move during ADS (e.g., the weapon model)
+    public GameObject adsObject;  // The object you want to move during ADS (e.g., the weapon model)
+    public GameObject adsSight;   // The sight object where the player should look through when ADS
     public bool isAiming = false; // Tracks if player is aiming
-    public float adsFOV = 40f; // Field of view while aiming
+    public float adsFOV = 40f;    // Field of view while aiming
     public float normalFOV = 60f; // Normal field of view
     public Vector3 adsPosition = new Vector3(0, -0.2f, 0.5f); // Position of the gun while aiming
     public Vector3 normalPosition = new Vector3(0.5f, -0.5f, 1.0f); // Normal position of the gun
     public float adsSpeed = 0.2f; // Speed of transitioning between ADS and normal
+
 
     [Header("Recoil Settings")]
     public Vector2[] recoilPattern; // Array of x, y values for fixed recoil pattern
@@ -76,6 +79,10 @@ public class Weapon : MonoBehaviour, IWeapon
     public float spreadIncreasePerShot = 0.01f; // Spread increase per shot
     public float spreadResetSpeed = 0.05f; // Speed at which spread resets to base
     private float currentSpread;
+
+    [Header("Magazine Settings")]
+    public Transform magPosition; // Transform or GameObject representing the magazine
+
 
 
     void Start()
@@ -281,13 +288,22 @@ public class Weapon : MonoBehaviour, IWeapon
         {
             isReloading = true;
             animator.SetTrigger(reloadTrigger); 
+            ikHandler.StartReloadIK();  // Start IK handling when reloading begins
             StartCoroutine(ReloadRoutine(animator.GetCurrentAnimatorStateInfo(0).length));
         }
     }
 
     IEnumerator ReloadRoutine(float reloadTime)
     {
-        yield return new WaitForSeconds(reloadTime); // Wait for the reload animation to finish
+        yield return new WaitForSeconds(0.2f); // Wait a bit before the hand starts moving
+
+        magPosition.gameObject.SetActive(false); // Simulate mag removal
+
+        yield return new WaitForSeconds(reloadTime / 2); // Wait to simulate replacement
+
+        magPosition.gameObject.SetActive(true); // Simulate mag insertion
+
+        yield return new WaitForSeconds(reloadTime / 2);
 
         mag--;
         ammo = magAmmo;
@@ -296,6 +312,7 @@ public class Weapon : MonoBehaviour, IWeapon
         ammoText.text = ammo + "/" + magAmmo;
 
         isReloading = false;
+        ikHandler.StopReloadIK();  // Stop IK handling when reload is done
     }
 
     public void Fire()
