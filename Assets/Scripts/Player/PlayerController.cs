@@ -1,12 +1,11 @@
 using Photon.Pun;
 using UnityEngine;
 using System.Collections;
-using System.Collections.Generic;
 
 public class PlayerController : MonoBehaviourPun
 {
     public Movement movement;
-    public PlayerClass playerClass;  // Add reference to the ScriptableObject
+    public PlayerClass playerClass;
     private Skill[] currentSkills;
     private bool isSprinting;
     private bool isCrouching;
@@ -15,6 +14,7 @@ public class PlayerController : MonoBehaviourPun
 
     [Header("Player States")]
     public bool canMove = true;
+    public bool isADS = false;
 
     void Start()
     {
@@ -23,15 +23,19 @@ public class PlayerController : MonoBehaviourPun
             return;
         }
 
+        if (movement == null)
+        {
+            Debug.LogError("Movement script is not assigned to PlayerController.");
+            return;
+        }
+
         // Initialize the class data (assign model, weapons, and skills)
         InitializeClass(playerClass);
     }
 
-     void InitializeClass(PlayerClass chosenClass)
+    void InitializeClass(PlayerClass chosenClass)
     {
-        // Set movement stats
         movement.SetMovementStats(chosenClass);
-        // Assign skills
         currentSkills = chosenClass.skills;
 
         // Additional setup for abilities, UI, etc.
@@ -44,36 +48,41 @@ public class PlayerController : MonoBehaviourPun
             HandleInput();
             HandleMovement();
         }
-        // Handle skill usage or other class-specific actions
+
         HandleSkills();
     }
+
     void HandleSkills()
     {
-        // Example for handling skill activation (could be skill 1, 2, 3...)
-        if (Input.GetButtonDown("Skill1") && currentSkills.Length > 0)
+        if (Input.GetButtonDown("Skill1") && currentSkills.Length > 0 && currentSkills[0].IsReady())
         {
             UseSkill(currentSkills[0]);
         }
     }
+
     void UseSkill(Skill skill)
     {
         if (skill != null)
         {
-            // Handle skill logic (e.g., cooldown, mana cost, etc.)
-            Instantiate(skill.skillEffectPrefab, transform.position, Quaternion.identity); // Example of skill activation
+            skill.Activate();  // Assuming the Skill class has an Activate method to handle logic
+            Instantiate(skill.skillEffectPrefab, transform.position, Quaternion.identity);
         }
     }
 
     void HandleInput()
     {
-        isSprinting = Input.GetButton("Sprint");
+        // Check sprint input only if there's enough stamina and stamina is above zero
+        if (movement.currentStamina > 0)
+        {
+            isSprinting = Input.GetButton("Sprint");
+        }
+        else
+        {
+            isSprinting = false; // Stop sprinting if stamina is zero
+        }
+
         isCrouching = Input.GetButton("Crouch");
         isJumping = Input.GetButton("Jump");
-
-        if (isSprinting && isCrouching && movement.grounded && !isSliding)
-        {
-            StartSlide();
-        }
     }
 
     void HandleMovement()
@@ -86,24 +95,5 @@ public class PlayerController : MonoBehaviourPun
         {
             movement.MovePlayer();
         }
-    }
-
-    void StartSlide()
-    {
-        isSliding = true;
-        movement.StartSlide();
-        StartCoroutine(SlideCooldown(movement.slideDuration));
-    }
-
-    IEnumerator SlideCooldown(float duration)
-    {
-        yield return new WaitForSeconds(duration);
-        EndSlide();
-    }
-
-    void EndSlide()
-    {
-        isSliding = false;
-        movement.EndSlide();
     }
 }
