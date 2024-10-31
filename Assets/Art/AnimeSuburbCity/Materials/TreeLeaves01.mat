@@ -21,8 +21,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: TreeLeaves01
-  m_Shader: {fileID: -6465566751694194690, guid: 51a900efa8934734197e31f1e1a94af5,
-    type: 3}
+  m_Shader: {fileID: -6465566751694194690, guid: 51a900efa8934734197e31f1e1a94af5, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
@@ -32,7 +31,7 @@ Material:
   m_LightmapFlags: 2
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: 3000
+  m_CustomRenderQueue: 2450
   stringTagMap:
     RenderType: Transparent
   disabledShaderPasses:
@@ -91,7 +90,6 @@ Material:
     - _TopColor: {r: 0.9254902, g: 0.67086256, b: 0.2666667, a: 1}
     - _WindDirection: {r: 5, g: 5, b: 0, a: 0}
   m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!114 &5738509072622443304
 MonoBehaviour:
   m_ObjectHideFlags: 11

@@ -1,6 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 using Photon.Pun;
 using UnityEngine.UI;
@@ -10,8 +8,15 @@ public class Movement : MonoBehaviourPun
     private float walkSpeed;
     private float sprintSpeed;
     private float crouchSpeed;
+    private float moveSpeed; // Current movement speed
+
     public float accelerationTime = 0.5f;
     public float decelerationTime = 0.3f;
+
+    [Header("Crouch Settings")]
+    public float crouchHeight = 1.0f;
+    private float standHeight;
+    public float crouchTransitionSpeed = 5f;
 
     [Header("Air Control")]
     public float airControlFactor = 0.2f;
@@ -20,7 +25,14 @@ public class Movement : MonoBehaviourPun
     [Header("Jump")]
     public float jumpHeight = 5f;
 
+    [Header("Animation")]
+    public Animator animator; // Use Animator instead of Animation
+    private static readonly int SpeedHash = Animator.StringToHash("Speed");
+
     private Vector2 input;
+    private Vector3 velocitySmoothing;
+    private Vector3 moveDirection;
+
     public CharacterController controller;
 
     [HideInInspector] public bool sprinting;
@@ -28,11 +40,10 @@ public class Movement : MonoBehaviourPun
     [HideInInspector] public bool crouching;
     public bool grounded = false;
 
-    private float currentSpeed = 0f;
-    private float targetSpeed = 0f;
-
-    private Vector3 velocitySmoothing;
-    private Vector3 moveDirection;
+    [Header("Mouse Look")]
+    public float mouseSensitivity = 100f;
+    public float maxLookAngle = 90f;
+    private float xRotation = 0f;
 
     [Header("Ground Check")]
     public Transform groundCheck;
@@ -51,21 +62,25 @@ public class Movement : MonoBehaviourPun
     public Transform playerCamera;
     public float bobbingSpeed = 0.18f;
     public float bobbingAmount = 0.05f;
-    private float sprintBobbingSpeed = 0.25f; // Increased speed while sprinting
-    private float sprintBobbingAmount = 0.1f; // Increased bobbing amount while sprinting
+    private float sprintBobbingSpeed = 0.25f;
+    private float sprintBobbingAmount = 0.1f;
     private float defaultPosY = 0;
     private float bobTimer = 0;
 
     void Start()
     {
-        if (!photonView.IsMine)
-        {
-            return;
-        }
+        if (!photonView.IsMine) return;
+
         controller = GetComponent<CharacterController>();
+        standHeight = controller.height;
         currentStamina = maxStamina;
         defaultPosY = playerCamera.localPosition.y;
 
+        InitializeStaminaUI();
+    }
+
+    private void InitializeStaminaUI()
+    {
         if (staminaSlider != null)
         {
             staminaSlider.maxValue = maxStamina;
@@ -85,51 +100,87 @@ public class Movement : MonoBehaviourPun
 
     void Update()
     {
+        if (!photonView.IsMine) return;
+
         GroundCheck();
         ManageStamina();
         HandleHeadBobbing();
+        HandleMouseLook();
 
-        input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
-        input.Normalize();
-
-        if (crouching && grounded && !sprinting)
-        {
-            targetSpeed = crouchSpeed;
-        }
-        else if (input.magnitude > 0.5f)
-        {
-            targetSpeed = sprinting ? sprintSpeed : walkSpeed;
-        }
-        else
-        {
-            targetSpeed = 0f;
-        }
+        UpdateInput();
+        UpdateMovement();
+        UpdateAnimation();
     }
 
-    public void MovePlayer()
+    private void UpdateInput()
     {
+        input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")).normalized;
+    }
+
+    private void UpdateMovement()
+    {
+        moveSpeed = DetermineMoveSpeed();
+
         if (grounded)
         {
-            if (jumping)
-            {
-                moveDirection.y = Mathf.Sqrt(jumpHeight * -2f * Physics.gravity.y);
-            }
-
-            currentSpeed = Mathf.SmoothDamp(currentSpeed, targetSpeed, ref velocitySmoothing.x, input.magnitude > 0.5f ? accelerationTime : decelerationTime);
-
-            Vector3 move = transform.right * input.x + transform.forward * input.y;
-            moveDirection.x = move.x * currentSpeed;
-            moveDirection.z = move.z * currentSpeed;
+            HandleGroundMovement();
+            AdjustCharacterHeight();
         }
         else
         {
-            moveDirection.x *= airDrag;
-            moveDirection.z *= airDrag;
+            HandleAirMovement();
         }
 
-        moveDirection.y += Physics.gravity.y * Time.deltaTime;
-
         controller.Move(moveDirection * Time.deltaTime);
+    }
+
+    private float DetermineMoveSpeed()
+    {
+        if (crouching && grounded && !sprinting) return crouchSpeed;
+        return input.magnitude > 0.5f ? (sprinting ? sprintSpeed : walkSpeed) : 0f;
+    }
+
+    private void HandleGroundMovement()
+    {
+        if (jumping)
+            moveDirection.y = Mathf.Sqrt(jumpHeight * -2f * Physics.gravity.y);
+
+        float targetSpeed = moveSpeed;
+        moveSpeed = Mathf.SmoothDamp(moveSpeed, targetSpeed, ref velocitySmoothing.x, input.magnitude > 0.5f ? accelerationTime : decelerationTime);
+
+        Vector3 move = transform.right * input.x + transform.forward * input.y;
+        moveDirection.x = move.x * moveSpeed;
+        moveDirection.z = move.z * moveSpeed;
+    }
+
+    private void HandleAirMovement()
+    {
+        moveDirection.x *= airDrag;
+        moveDirection.z *= airDrag;
+        moveDirection.y += Physics.gravity.y * Time.deltaTime;
+    }
+
+    private void AdjustCharacterHeight()
+    {
+        controller.height = Mathf.Lerp(controller.height, crouching ? crouchHeight : standHeight, Time.deltaTime * crouchTransitionSpeed);
+    }
+
+    private void UpdateAnimation()
+    {
+        animator.SetFloat(SpeedHash, moveSpeed); // Update animator speed
+        animator.SetBool("isSprinting", sprinting);
+    }
+
+    private void HandleMouseLook()
+    {
+        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime;
+        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime;
+
+        xRotation -= mouseY;
+        xRotation = Mathf.Clamp(xRotation, -maxLookAngle, maxLookAngle);
+
+        playerCamera.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+        transform.Rotate(Vector3.up * mouseX);
     }
 
     private void GroundCheck()
@@ -141,17 +192,12 @@ public class Movement : MonoBehaviourPun
         }
     }
 
-    void ManageStamina()
+    private void ManageStamina()
     {
         if (sprinting && currentStamina > 0)
         {
             currentStamina -= staminaUseRate * Time.deltaTime;
-
-            if (currentStamina <= 0)
-            {
-                currentStamina = 0;
-                sprinting = false;
-            }
+            if (currentStamina <= 0) sprinting = false;
         }
         else
         {
@@ -159,17 +205,14 @@ public class Movement : MonoBehaviourPun
         }
 
         currentStamina = Mathf.Clamp(currentStamina, 0, maxStamina);
-
         if (staminaSlider != null)
-        {
             staminaSlider.value = currentStamina;
-        }
     }
 
-    void HandleHeadBobbing()
+    private void HandleHeadBobbing()
     {
         float currentBobbingSpeed = sprinting ? sprintBobbingSpeed : bobbingSpeed;
-        float currentBobbingAmount = sprinting ? sprintBobbingAmount : bobbingAmount;
+        float currentBobbingAmount = sprintBobbingAmount;
 
         if (input.magnitude > 0.5f)
         {

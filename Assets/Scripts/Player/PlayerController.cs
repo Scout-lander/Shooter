@@ -40,6 +40,13 @@ public class PlayerController : MonoBehaviourPun
 
         // Additional setup for abilities, UI, etc.
     }
+    void OnPhotonInstantiate(PhotonMessageInfo info)
+    {
+        if (photonView.IsMine)
+        {
+            InitializeClass(playerClass);
+        }
+    }
 
     void Update()
     {
@@ -61,27 +68,19 @@ public class PlayerController : MonoBehaviourPun
     }
 
     void UseSkill(Skill skill)
+{
+    if (skill != null)
     {
-        if (skill != null)
-        {
-            skill.Activate();  // Assuming the Skill class has an Activate method to handle logic
-            Instantiate(skill.skillEffectPrefab, transform.position, Quaternion.identity);
-        }
+        skill.Activate();
+        Instantiate(skill.skillEffectPrefab, transform.position, Quaternion.identity);
+        //UpdateSkillUI(skill);  // Placeholder method to update cooldown UI
     }
+}
 
     void HandleInput()
     {
-        // Check sprint input only if there's enough stamina and stamina is above zero
-        if (movement.currentStamina > 0)
-        {
-            isSprinting = Input.GetButton("Sprint");
-        }
-        else
-        {
-            isSprinting = false; // Stop sprinting if stamina is zero
-        }
-
-        isCrouching = Input.GetButton("Crouch");
+        isSprinting = Input.GetButton("Sprint") && movement.currentStamina > 0;
+        isCrouching = Input.GetButton("Crouch") && !isSprinting;
         isJumping = Input.GetButton("Jump");
     }
 
@@ -90,10 +89,5 @@ public class PlayerController : MonoBehaviourPun
         movement.sprinting = isSprinting;
         movement.crouching = isCrouching;
         movement.jumping = isJumping;
-
-        if (!isSliding)
-        {
-            movement.MovePlayer();
-        }
     }
 }

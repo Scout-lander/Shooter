@@ -8,9 +8,9 @@ public class Weapon : MonoBehaviour, IWeapon
 {
     public Camera camera;
     [SerializeField] private PlayerController player;
+    [SerializeField] private WeaponRecoil weapomRecoil;
     public int damage;
     public float fireRate = 0.3f;
-    public WeaponIKHandler ikHandler;
 
     private float nextFire;
 
@@ -54,6 +54,19 @@ public class Weapon : MonoBehaviour, IWeapon
     public float adsSpeed = 0.2f;
 
     public CameraRecoil Recoil;
+
+    [Header("SFX")]
+    public int shootSFXIndex = 0;
+    public PlayerPhotonSound photonSound;
+
+    [Header("Rig")]
+    public Transform rightHandIK; // Reference to player’s right hand IK Transform
+    public Transform leftHandIK;  // Reference to player’s left hand IK Transform
+
+    public Transform rightHandIKTarget; // Target for the right hand
+    public Transform leftHandIKTarget;  // Target for the left hand
+
+
 
     void Start()
     {
@@ -150,6 +163,7 @@ public class Weapon : MonoBehaviour, IWeapon
 
             Fire();
             Recoil.RecoilFire();
+            weapomRecoil.GunKick(isAiming);
 
             StartCoroutine(ResetFiringAfterDelay(fireRate));
         }
@@ -167,6 +181,7 @@ public class Weapon : MonoBehaviour, IWeapon
 
             Fire();
             Recoil.RecoilFire();
+            weapomRecoil.GunKick(isAiming);
         }
 
         if (Input.GetButtonUp("Fire1"))
@@ -197,6 +212,7 @@ public class Weapon : MonoBehaviour, IWeapon
 
             Fire();
             Recoil.RecoilFire();
+            weapomRecoil.GunKick(isAiming);
             shotsFired++;
 
             yield return new WaitForSeconds(burstFireRate);
@@ -234,6 +250,8 @@ public class Weapon : MonoBehaviour, IWeapon
         isFiring = true;
         animator.speed = 1 / fireRate;
 
+        photonSound.PlayShootSFX(shootSFXIndex);
+
         GameObject flashInstance = Instantiate(muzzleFlash, muzzleTransform.position, muzzleTransform.rotation);
         Destroy(flashInstance, muzzleFlashDuration);
 
@@ -247,11 +265,13 @@ public class Weapon : MonoBehaviour, IWeapon
 
             if (targetHealth != null)
             {
+                // Apply damage to both players and enemies
                 hit.transform.gameObject.GetComponent<PhotonView>().RPC("TakeDamage", RpcTarget.All, damage);
-                if (targetHealth.health - damage <= 0)
+
+                // Increment kill count if it's an enemy and health is 0 after damage
+                if (hit.transform.CompareTag("Enemy") && targetHealth.health - damage <= 0)
                 {
-                    RoomManager.instance.kills++;
-                    RoomManager.instance.SetHashes();
+                    RoomManager.instance.photonView.RPC("IncrementKills", RpcTarget.All);
                 }
             }
         }
