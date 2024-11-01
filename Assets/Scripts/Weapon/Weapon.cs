@@ -6,65 +6,68 @@ using UnityEngine;
 
 public class Weapon : MonoBehaviour, IWeapon
 {
+    // Configuration Fields
+    [Header("Camera & Controller")]
     public Camera camera;
     [SerializeField] private PlayerController player;
-    [SerializeField] private WeaponRecoil weapomRecoil;
+
+    [Header("Recoil & Effects")]
+    [SerializeField] private WeaponRecoil weaponRecoil;
+    public CameraRecoil Recoil;
+
+    [Header("Weapon Stats")]
     public int damage;
     public float fireRate = 0.3f;
-
-    private float nextFire;
+    public int mag = 5;
+    public int ammo = 30;
+    public int magAmmo = 30;
 
     public enum FireMode { Single, Auto, Burst }
     public FireMode currentFireMode = FireMode.Single;
-
     public List<FireMode> availableFireModes = new List<FireMode> { FireMode.Single };
-
     public int burstCount = 3;
     public float burstFireRate = 0.1f;
 
+    [Header("Ammo UI")]
+    public TextMeshProUGUI magText;
+    public TextMeshProUGUI ammoText;
+    public TextMeshProUGUI fireModeText;
+
+    [Header("Visual Effects")]
     public GameObject hitVFX;
     public GameObject muzzleFlash;
     public Transform muzzleTransform;
     public float muzzleFlashDuration = 0.05f;
 
-    public int mag = 5;
-    public int ammo = 30;
-    public int magAmmo = 30;
-    public int lowAmmoThreshold = 5;
-
-    public TextMeshProUGUI magText;
-    public TextMeshProUGUI ammoText;
-    public TextMeshProUGUI fireModeText;
-
+    [Header("Animator")]
     public Animator animator;
     private string reloadTrigger = "reload";
     private string recoilTrigger = "recoil";
-    private bool isReloading = false;
 
-    private bool isFiring = false;
-    private Coroutine burstCoroutine;
-
+    [Header("Aiming Down Sights (ADS)")]
     public GameObject adsObject;
     public GameObject adsSight;
     public bool isAiming = false;
     public float adsFOV = 40f;
     public float normalFOV = 60f;
     public Vector3 normalPosition = new Vector3(0.5f, -0.5f, 1.0f);
-    public Vector3 adsOffset;  // New adjustable ADS offset variable
+    public Vector3 adsOffset;
     public float adsSpeed = 0.2f;
 
-    public CameraRecoil Recoil;
-
-    [Header("SFX")]
+    [Header("Sound Effects")]
     public int shootSFXIndex = 0;
     public PlayerPhotonSound photonSound;
 
-    [Header("Rig")]
-    public Transform rightHandIK; // Reference to player’s right hand IK Transform
-    public Transform leftHandIK;  // Reference to player’s left hand IK Transform
+    [Header("Hand IK Targets")]
+    public Transform rightHandIK;
+    public Transform leftHandIK;
 
-    public Transform rightHandIKTarget; // Target for the right hand
-    public Transform leftHandIKTarget;  // Target for the left hand
+    // Private Variables
+    private float nextFire;
+    private bool isReloading = false;
+    private bool isFiring = false;
+    private Coroutine burstCoroutine;
+    private int lowAmmoThreshold = 5;
 
 
 
@@ -73,6 +76,7 @@ public class Weapon : MonoBehaviour, IWeapon
         magText.text = mag.ToString();
         ammoText.text = ammo + "/" + magAmmo;
         UpdateFireModeUI();
+        UpdateWeaponUI();
     }
 
     void Update()
@@ -89,18 +93,9 @@ public class Weapon : MonoBehaviour, IWeapon
             SwitchFireMode();
         }
 
-        if (currentFireMode == FireMode.Auto)
-        {
-            HandleAutomaticFire();
-        }
-        else if (currentFireMode == FireMode.Single)
-        {
-            HandleSingleShotFire();
-        }
-        else if (currentFireMode == FireMode.Burst)
-        {
-            HandleBurstFire();
-        }
+         if (currentFireMode == FireMode.Auto) HandleAutomaticFire();
+        else if (currentFireMode == FireMode.Single) HandleSingleShotFire();
+        else if (currentFireMode == FireMode.Burst) HandleBurstFire();
 
         if (Input.GetKeyDown(KeyCode.R) && !isReloading && mag > 0)
         {
@@ -118,6 +113,7 @@ public class Weapon : MonoBehaviour, IWeapon
 
     void HandleADS()
     {
+        float smoothSpeed = Time.deltaTime * adsSpeed;
         if (Input.GetMouseButtonDown(1))
         {
             isAiming = true;
@@ -129,26 +125,9 @@ public class Weapon : MonoBehaviour, IWeapon
             player.isADS = false;
         }
 
-        float smoothSpeed = Time.deltaTime * adsSpeed;
-
-        if (isAiming)
-        {
-            camera.fieldOfView = Mathf.Lerp(camera.fieldOfView, adsFOV, smoothSpeed);
-
-            if (adsObject != null && adsSight != null)
-            {
-                Vector3 adsFinalPosition = normalPosition - adsObject.transform.InverseTransformPoint(adsSight.transform.position) + adsOffset;
-                adsObject.transform.localPosition = Vector3.Lerp(adsObject.transform.localPosition, adsFinalPosition, smoothSpeed);
-            }
-        }
-        else
-        {
-            camera.fieldOfView = Mathf.Lerp(camera.fieldOfView, normalFOV, smoothSpeed);
-            if (adsObject != null)
-            {
-                adsObject.transform.localPosition = Vector3.Lerp(adsObject.transform.localPosition, normalPosition, smoothSpeed);
-            }
-        }
+        camera.fieldOfView = Mathf.Lerp(camera.fieldOfView, isAiming ? adsFOV : normalFOV, smoothSpeed);
+        Vector3 targetPosition = isAiming ? (normalPosition - adsObject.transform.InverseTransformPoint(adsSight.transform.position) + adsOffset) : normalPosition;
+        if (adsObject != null) adsObject.transform.localPosition = Vector3.Lerp(adsObject.transform.localPosition, targetPosition, smoothSpeed);
     }
 
     public void HandleSingleShotFire()
@@ -163,7 +142,7 @@ public class Weapon : MonoBehaviour, IWeapon
 
             Fire();
             Recoil.RecoilFire();
-            weapomRecoil.GunKick(isAiming);
+            weaponRecoil.GunKick(isAiming);
 
             StartCoroutine(ResetFiringAfterDelay(fireRate));
         }
@@ -181,7 +160,7 @@ public class Weapon : MonoBehaviour, IWeapon
 
             Fire();
             Recoil.RecoilFire();
-            weapomRecoil.GunKick(isAiming);
+            weaponRecoil.GunKick(isAiming);
         }
 
         if (Input.GetButtonUp("Fire1"))
@@ -212,7 +191,7 @@ public class Weapon : MonoBehaviour, IWeapon
 
             Fire();
             Recoil.RecoilFire();
-            weapomRecoil.GunKick(isAiming);
+            weaponRecoil.GunKick(isAiming);
             shotsFired++;
 
             yield return new WaitForSeconds(burstFireRate);
@@ -261,18 +240,14 @@ public class Weapon : MonoBehaviour, IWeapon
         if (Physics.Raycast(ray, out hit, 100f))
         {
             PhotonNetwork.Instantiate(hitVFX.name, hit.point, Quaternion.identity);
+
             Health targetHealth = hit.transform.gameObject.GetComponent<Health>();
+            PhotonView targetPhotonView = hit.transform.gameObject.GetComponent<PhotonView>();
 
-            if (targetHealth != null)
+            // Only call TakeDamage on other clients if the target has a PhotonView
+            if (targetPhotonView != null)
             {
-                // Apply damage to both players and enemies
-                hit.transform.gameObject.GetComponent<PhotonView>().RPC("TakeDamage", RpcTarget.All, damage);
-
-                // Increment kill count if it's an enemy and health is 0 after damage
-                if (hit.transform.CompareTag("Enemy") && targetHealth.health - damage <= 0)
-                {
-                    RoomManager.instance.photonView.RPC("IncrementKills", RpcTarget.All);
-                }
+                targetPhotonView.RPC("TakeDamage", RpcTarget.OthersBuffered, damage, PhotonNetwork.LocalPlayer.NickName);
             }
         }
     }
@@ -282,6 +257,7 @@ public class Weapon : MonoBehaviour, IWeapon
         isFiring = false;
         animator.speed = 1;
     }
+    
 
     IEnumerator ResetFiringAfterDelay(float delay)
     {
@@ -296,15 +272,15 @@ public class Weapon : MonoBehaviour, IWeapon
         UpdateFireModeUI();
     }
 
-    public void UpdateFireModeUI()
+     public void UpdateFireModeUI()
     {
         fireModeText.text = currentFireMode.ToString();
     }
 
-    public void UpdateWeaponUI()
+     public void UpdateWeaponUI()
     {
         magText.text = mag.ToString();
         ammoText.text = ammo + "/" + magAmmo;
-        fireModeText.text = currentFireMode.ToString();
+        UpdateFireModeUI();
     }
 }

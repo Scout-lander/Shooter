@@ -44,19 +44,17 @@ public class Health : MonoBehaviourPun
     {
         if (isLocalPlayer && Input.GetKeyDown(KeyCode.P))
         {
-            TakeDamage(30, PhotonNetwork.LocalPlayer);
+            TakeDamage(30, "DamageTest");
         }
     }
 
     [PunRPC]
-    public void TakeDamage(int _damage, Photon.Realtime.Player attacker)
+    public void TakeDamage(int damage, string attackerName)
     {
         if (hasDied) return;
 
-        health -= _damage;
+        health -= damage;
         health = Mathf.Clamp(health, 0, maxHealth); // Ensure health does not drop below zero
-        lastAttacker = attacker;
-
         UpdateHealthUI();
 
         if (isLocalPlayer)
@@ -65,9 +63,14 @@ public class Health : MonoBehaviourPun
             StartCoroutine(RedFlashEffect());
         }
 
-        if (health <= 0 && !hasDied)
+        // Only the owning player handles the death and PhotonNetwork.Destroy
+        if (health <= 0 && !hasDied && photonView.IsMine)
         {
             hasDied = true;
+            
+            // Broadcast the kill notification to all clients
+            photonView.RPC("BroadcastKillNotification", RpcTarget.All, attackerName, PhotonNetwork.LocalPlayer.NickName);
+
             HandlePlayerDeath();
             PhotonNetwork.Destroy(gameObject);
         }
@@ -88,7 +91,11 @@ public class Health : MonoBehaviourPun
 
     private void HandlePlayerDeath()
     {
-        photonView.RPC("BroadcastKillNotification", RpcTarget.All, lastAttacker.NickName, PhotonNetwork.LocalPlayer.NickName);
+        // Broadcast the kill notification to all clients
+        if (lastAttacker != null && photonView.IsMine)
+        {
+            photonView.RPC("BroadcastKillNotification", RpcTarget.All, lastAttacker.NickName, PhotonNetwork.LocalPlayer.NickName);
+        }
 
         if (RoomManager.instance != null)
         {

@@ -5,12 +5,13 @@ using UnityEngine.Animations.Rigging;
 
 public class WeaponSwitcher : MonoBehaviour
 {
+    [Header("Photon & Animation")]
     public PhotonView playerSetupView;
     public Animator weaponAnimator; // Reference to the Animator
 
-    // References to Two Bone IK Constraints
-    public Transform rightHandIKTarget;
-    public Transform leftHandIKTarget;
+    [Header("IK Constraints")]
+    public TwoBoneIKConstraint rightHandIKConstraint;
+    public TwoBoneIKConstraint leftHandIKConstraint;
 
     private int selectedWeapon = 0;
     private int totalWeapons;
@@ -71,7 +72,6 @@ public class WeaponSwitcher : MonoBehaviour
         }
 
         int index = 0;
-
         foreach (Transform weapon in transform)
         {
             bool isActive = index == selectedWeapon;
@@ -82,7 +82,6 @@ public class WeaponSwitcher : MonoBehaviour
                 StartCoroutine(PlayDrawAnimation());
                 UpdateWeaponUI(weapon);
 
-                // Set the IK targets for the active weapon
                 Weapon weaponScript = weapon.GetComponent<Weapon>();
                 if (weaponScript != null)
                 {
@@ -92,6 +91,27 @@ public class WeaponSwitcher : MonoBehaviour
             index++;
         }
     }
+
+    public RigBuilder rigBuilder; // Assign this in the inspector
+
+    private void UpdateIKConstraints(Transform rightTarget, Transform leftTarget)
+    {
+        if (rightHandIKConstraint != null && rightTarget != null)
+        {
+            rightHandIKConstraint.data.target = rightTarget;
+        }
+        if (leftHandIKConstraint != null && leftTarget != null)
+        {
+            leftHandIKConstraint.data.target = leftTarget;
+        }
+
+        // Force the rig to update
+        if (rigBuilder != null)
+        {
+            rigBuilder.Build();
+        }
+    }
+
 
     private IEnumerator PlayDrawAnimation()
     {
@@ -107,22 +127,6 @@ public class WeaponSwitcher : MonoBehaviour
             //weaponAnimator.Play("WeaponChange");
         }
     }
-    private void UpdateIKConstraints(Transform rightTarget, Transform leftTarget)
-    {
-        if (rightTarget != null && rightHandIKTarget != null)
-        {
-            rightHandIKTarget.position = rightTarget.position;
-            rightHandIKTarget.rotation = rightTarget.rotation;
-        }
-
-        if (leftTarget != null && leftHandIKTarget != null)
-        {
-            leftHandIKTarget.position = leftTarget.position;
-            leftHandIKTarget.rotation = leftTarget.rotation;
-        }
-    }
-
-      
 
     private void UpdateWeaponUI(Transform weapon)
     {
