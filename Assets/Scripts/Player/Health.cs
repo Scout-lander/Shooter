@@ -54,7 +54,8 @@ public class Health : MonoBehaviourPun
         if (hasDied) return;
 
         // Apply headshot multiplier if true
-        if (isHeadshot) {
+        if (isHeadshot)
+        {
             damage *= 2; // For example, double the damage
         }
 
@@ -79,8 +80,8 @@ public class Health : MonoBehaviourPun
 
     void OnCollisionEnter(Collision collision)
     {
-        // Check if the hit is on a player
-        if (collision.gameObject.CompareTag("Player"))
+        // Check if the hit is on another player, not self
+        if (collision.gameObject.CompareTag("Player") && collision.gameObject != gameObject)
         {
             bool isHeadshot = collision.collider.CompareTag("Head");
             int damageAmount = isHeadshot ? 50 : 20; // Example damage values
@@ -106,11 +107,6 @@ public class Health : MonoBehaviourPun
     private void HandlePlayerDeath()
     {
         // Broadcast the kill notification to all clients
-        if (lastAttacker != null && photonView.IsMine)
-        {
-            photonView.RPC("BroadcastKillNotification", RpcTarget.All, lastAttacker.NickName, PhotonNetwork.LocalPlayer.NickName);
-        }
-
         if (RoomManager.instance != null)
         {
             RoomManager.instance.OnPlayerDeath();
