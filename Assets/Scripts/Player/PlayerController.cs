@@ -6,11 +6,12 @@ public class PlayerController : MonoBehaviourPun
 {
     public Movement movement;
     public PlayerClass playerClass;
+    public PlayerDash playerDash;
     private Skill[] currentSkills;
-    private bool isSprinting;
+    public bool isSprinting;
     private bool isCrouching;
     private bool isJumping;
-    private bool isSliding;
+    private bool isDashing;
 
     [Header("Player States")]
     public bool canMove = true;
@@ -26,6 +27,11 @@ public class PlayerController : MonoBehaviourPun
         if (movement == null)
         {
             Debug.LogError("Movement script is not assigned to PlayerController.");
+            return;
+        }
+        if (playerDash == null)
+        {
+            Debug.LogError("PlayerDash script is not assigned to PlayerController.");
             return;
         }
 
@@ -89,5 +95,12 @@ public class PlayerController : MonoBehaviourPun
         movement.sprinting = isSprinting;
         movement.crouching = isCrouching;
         movement.jumping = isJumping;
+    }
+    void HandleDash()
+    {
+        if (Input.GetMouseButtonDown(2) && playerDash != null && !isSprinting && !isJumping && playerDash.CanDash())
+        {
+            playerDash.PerformDash();
+        }
     }
 }

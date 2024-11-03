@@ -15,7 +15,7 @@ MonoBehaviour:
   className: RougePlayer
   walkSpeed: 5
   sprintSpeed: 8
-  crouchSpeed: 4
+  crouchSpeed: 3
   jumpHeight: 1
   slideSpeed: 7
   staminaUseRate: 20

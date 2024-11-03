@@ -49,12 +49,17 @@ public class Health : MonoBehaviourPun
     }
 
     [PunRPC]
-    public void TakeDamage(int damage, string attackerName)
+    public void TakeDamage(int damage, string attackerName, bool isHeadshot = false)
     {
         if (hasDied) return;
 
+        // Apply headshot multiplier if true
+        if (isHeadshot) {
+            damage *= 2; // For example, double the damage
+        }
+
         health -= damage;
-        health = Mathf.Clamp(health, 0, maxHealth); // Ensure health does not drop below zero
+        health = Mathf.Clamp(health, 0, maxHealth);
         UpdateHealthUI();
 
         if (isLocalPlayer)
@@ -63,16 +68,25 @@ public class Health : MonoBehaviourPun
             StartCoroutine(RedFlashEffect());
         }
 
-        // Only the owning player handles the death and PhotonNetwork.Destroy
         if (health <= 0 && !hasDied && photonView.IsMine)
         {
             hasDied = true;
-            
-            // Broadcast the kill notification to all clients
             photonView.RPC("BroadcastKillNotification", RpcTarget.All, attackerName, PhotonNetwork.LocalPlayer.NickName);
-
             HandlePlayerDeath();
             PhotonNetwork.Destroy(gameObject);
+        }
+    }
+
+    void OnCollisionEnter(Collision collision)
+    {
+        // Check if the hit is on a player
+        if (collision.gameObject.CompareTag("Player"))
+        {
+            bool isHeadshot = collision.collider.CompareTag("Head");
+            int damageAmount = isHeadshot ? 50 : 20; // Example damage values
+            string attackerName = PhotonNetwork.LocalPlayer.NickName;
+
+            collision.gameObject.GetComponent<Health>().photonView.RPC("TakeDamage", RpcTarget.AllBuffered, damageAmount, attackerName, isHeadshot);
         }
     }
 

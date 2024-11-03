@@ -5,17 +5,17 @@ using UnityEngine.Animations.Rigging;
 
 public class WeaponSwitcher : MonoBehaviour
 {
-    [Header("Photon & Animation")]
+    [Header("Set Up")]
     public PhotonView playerSetupView;
-    public Animator weaponAnimator; // Reference to the Animator
 
-    [Header("IK Constraints")]
-    public TwoBoneIKConstraint rightHandIKConstraint;
-    public TwoBoneIKConstraint leftHandIKConstraint;
+    [Header("IK Constraints for FP")]
+    public Animator fpAnimator; // First-Person Animator
+    public TwoBoneIKConstraint fpRightHandIKConstraint;
+    public TwoBoneIKConstraint fpLeftHandIKConstraint;
+    public RigBuilder fpRigBuilder; // First-Person RigBuilder
 
     private int selectedWeapon = 0;
     private int totalWeapons;
-
     void Start()
     {
         totalWeapons = transform.childCount; // Get the total number of weapons
@@ -31,7 +31,6 @@ public class WeaponSwitcher : MonoBehaviour
         HandleNumberKeyInput();
         HandleScrollInput();
 
-        // If the selected weapon has changed, select the new weapon
         if (previousSelectedWeapon != selectedWeapon)
         {
             SelectWeapon();
@@ -53,7 +52,6 @@ public class WeaponSwitcher : MonoBehaviour
     private void HandleScrollInput()
     {
         float scroll = Input.GetAxis("Mouse ScrollWheel");
-
         if (scroll > 0f)
         {
             selectedWeapon = (selectedWeapon + 1) % totalWeapons;
@@ -82,7 +80,10 @@ public class WeaponSwitcher : MonoBehaviour
                 StartCoroutine(PlayDrawAnimation());
                 UpdateWeaponUI(weapon);
 
+                // Get the script that holds IK targets for the first-person model
                 Weapon weaponScript = weapon.GetComponent<Weapon>();
+                // Assuming the third-person weapons are synced with the TPweaponHolder indices
+
                 if (weaponScript != null)
                 {
                     UpdateIKConstraints(weaponScript.rightHandIK, weaponScript.leftHandIK);
@@ -92,39 +93,30 @@ public class WeaponSwitcher : MonoBehaviour
         }
     }
 
-    public RigBuilder rigBuilder; // Assign this in the inspector
-
-    private void UpdateIKConstraints(Transform rightTarget, Transform leftTarget)
+    private void UpdateIKConstraints(Transform fpRightTarget, Transform fpLeftTarget)
     {
-        if (rightHandIKConstraint != null && rightTarget != null)
-        {
-            rightHandIKConstraint.data.target = rightTarget;
-        }
-        if (leftHandIKConstraint != null && leftTarget != null)
-        {
-            leftHandIKConstraint.data.target = leftTarget;
-        }
+        // Update first-person IK targets
+        if (fpRightHandIKConstraint != null && fpRightTarget != null)
+            fpRightHandIKConstraint.data.target = fpRightTarget;
+        if (fpLeftHandIKConstraint != null && fpLeftTarget != null)
+            fpLeftHandIKConstraint.data.target = fpLeftTarget;
 
-        // Force the rig to update
-        if (rigBuilder != null)
-        {
-            rigBuilder.Build();
-        }
+        // Rebuild the IK rigs
+        if (fpRigBuilder != null)
+            fpRigBuilder.Build();
+
     }
 
 
     private IEnumerator PlayDrawAnimation()
     {
-        if (weaponAnimator != null)
+        if (fpAnimator != null)
         {
-            weaponAnimator.SetTrigger("drawTrigger");
+            fpAnimator.SetTrigger("drawTrigger");
 
-            // Wait for the animation length before continuing
-            yield return new WaitForSeconds(1f);
+            yield return new WaitForSeconds(1f); // Wait for the animation length
 
-            // After waiting, reset trigger or proceed to the next state
-            weaponAnimator.ResetTrigger("drawTrigger");
-            //weaponAnimator.Play("WeaponChange");
+            fpAnimator.ResetTrigger("drawTrigger");
         }
     }
 

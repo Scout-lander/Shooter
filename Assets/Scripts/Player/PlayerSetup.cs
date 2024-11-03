@@ -4,6 +4,8 @@ using UnityEngine;
 using Photon.Pun;
 using TMPro;
 using ExitGames.Client.Photon;
+using UnityEngine.Animations.Rigging;
+
 
 public class PlayerSetup : MonoBehaviour
 {
@@ -12,24 +14,54 @@ public class PlayerSetup : MonoBehaviour
     public string nickname;
     public TextMeshPro nicknameText;
 
+ [Header("Third-Person Components")]
     public Transform TPweaponHolder;
+    public GameObject TPModel;
+    public Animator tpAnimator; // Third-Person Animator
+    public TwoBoneIKConstraint tpRightHandIKConstraint;
+    public TwoBoneIKConstraint tpLeftHandIKConstraint;
+    public RigBuilder tpRigBuilder; // Third-Person RigBuilder    public GameObject TPModel;
 
     public void IsLocalPlayer() // Fix method name here
     {
+        if (TPModel != null)
+        {
+            TPModel.SetActive(false);
+        }
         TPweaponHolder.gameObject.SetActive(false);
         movement.enabled = true;
         camera.SetActive(true);
     }
     [PunRPC]
-    public void SetTPWeapon(int _weaponIndex)
+    public void SetTPWeapon(int weaponIndex)
     {
-        foreach (Transform _weaon in TPweaponHolder)
+        foreach (Transform weapon in TPweaponHolder)
         {
-            _weaon.gameObject.SetActive(false);
+            weapon.gameObject.SetActive(false);
         }
 
-        TPweaponHolder.GetChild(_weaponIndex).gameObject.SetActive(true);
+        Transform selectedWeapon = TPweaponHolder.GetChild(weaponIndex);
+        selectedWeapon.gameObject.SetActive(true);
+
+        // Update IK targets
+        TPWeaponIK weaponIK = selectedWeapon.GetComponent<TPWeaponIK>();
+        if (weaponIK != null)
+        {
+            UpdateIKConstraints(weaponIK.rightHandIKTarget, weaponIK.leftHandIKTarget);
+        }
     }
+
+    private void UpdateIKConstraints(Transform rightHandTarget, Transform leftHandTarget)
+    {
+        if (tpRightHandIKConstraint != null)
+            tpRightHandIKConstraint.data.target = rightHandTarget;
+        if (tpLeftHandIKConstraint != null)
+            tpLeftHandIKConstraint.data.target = leftHandTarget;
+
+        if (tpRigBuilder != null)
+            tpRigBuilder.Build();
+    }
+
 
     [PunRPC]
     public void SetNickname(string _name)

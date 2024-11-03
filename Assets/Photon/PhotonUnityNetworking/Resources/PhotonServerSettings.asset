@@ -48,6 +48,15 @@ MonoBehaviour:
   - BroadcastEnemyDeath
   - OnEnemyDeath
   - PerformAttack
+  - SetAnimationParameter
+  - UpdateAnimatorParameters
+  - UpdateRemoteAnimatorParameters
+  - SetAnimatorBool
+  - UpdateState
+  - UpdateCrouchState
+  - RPCUpdateCrouchState
+  - RPCAnimatorBoolsParameters
+  - RPCAnimatorFloatParameters
   DisableAutoOpenWizard: 1
   ShowSettings: 1
   DevRegionSetOnce: 1

@@ -10,6 +10,7 @@ public class Weapon : MonoBehaviour, IWeapon
     [Header("Camera & Controller")]
     public Camera camera;
     [SerializeField] private PlayerController player;
+    private PhotonView photonView; 
 
     [Header("Recoil & Effects")]
     [SerializeField] private WeaponRecoil weaponRecoil;
@@ -69,8 +70,6 @@ public class Weapon : MonoBehaviour, IWeapon
     private Coroutine burstCoroutine;
     private int lowAmmoThreshold = 5;
 
-
-
     void Start()
     {
         magText.text = mag.ToString();
@@ -81,6 +80,11 @@ public class Weapon : MonoBehaviour, IWeapon
 
     void Update()
     {
+        if (player != null)
+        {
+            photonView = player.GetComponent<PhotonView>();
+        }
+        
         if (nextFire > 0)
         {
             nextFire -= Time.deltaTime;
@@ -93,17 +97,73 @@ public class Weapon : MonoBehaviour, IWeapon
             SwitchFireMode();
         }
 
-         if (currentFireMode == FireMode.Auto) HandleAutomaticFire();
-        else if (currentFireMode == FireMode.Single) HandleSingleShotFire();
-        else if (currentFireMode == FireMode.Burst) HandleBurstFire();
-
-        if (Input.GetKeyDown(KeyCode.R) && !isReloading && mag > 0)
-        {
-            Reload();
-        }
-
+        HandleFire();
+        HandleReload();
         HandleADS();
         HandleLowAmmoWarning();
+    }
+
+    private void HandleFire()
+    {
+        if (player.isSprinting || isReloading || ammo <= 0 || nextFire > 0) return;
+
+        switch (currentFireMode)
+        {
+            case FireMode.Single:
+                if (Input.GetButtonDown("Fire1"))
+                {
+                    FireWeapon();
+                }
+                break;
+            case FireMode.Auto:
+                if (Input.GetButton("Fire1"))
+                {
+                    FireWeapon();
+                }
+                break;
+            case FireMode.Burst:
+                if (Input.GetButtonDown("Fire1") && burstCoroutine == null)
+                {
+                    burstCoroutine = StartCoroutine(FireBurst());
+                }
+                break;
+        }
+
+        if (Input.GetButtonUp("Fire1") && currentFireMode == FireMode.Auto)
+        {
+            StopFiring();
+        }
+    }
+
+    private void FireWeapon()
+    {
+        // Shared firing logic
+        nextFire = fireRate;
+        ammo--;
+        UpdateWeaponUI();
+        animator.SetTrigger(recoilTrigger);
+
+        // Fire effects and recoil
+        Fire();
+        Recoil.RecoilFire();
+        weaponRecoil.GunKick(isAiming);
+
+        // Start the firing reset coroutine for proper timing
+        StartCoroutine(ResetFiringAfterDelay(fireRate));
+    }
+
+    IEnumerator FireBurst()
+    {
+        isFiring = true;
+        for (int i = 0; i < burstCount && ammo > 0; i++)
+        {
+            FireWeapon();
+            yield return new WaitForSeconds(burstFireRate);
+        }
+
+        isFiring = false;
+        nextFire = fireRate;
+        burstCoroutine = null;
     }
 
     void HandleLowAmmoWarning()
@@ -114,12 +174,13 @@ public class Weapon : MonoBehaviour, IWeapon
     void HandleADS()
     {
         float smoothSpeed = Time.deltaTime * adsSpeed;
-        if (Input.GetMouseButtonDown(1))
+
+        if (Input.GetMouseButtonDown(1) && !player.isSprinting)
         {
             isAiming = true;
             player.isADS = true;
         }
-        else if (Input.GetMouseButtonUp(1))
+        else if (Input.GetMouseButtonUp(1) || player.isSprinting)
         {
             isAiming = false;
             player.isADS = false;
@@ -130,76 +191,12 @@ public class Weapon : MonoBehaviour, IWeapon
         if (adsObject != null) adsObject.transform.localPosition = Vector3.Lerp(adsObject.transform.localPosition, targetPosition, smoothSpeed);
     }
 
-    public void HandleSingleShotFire()
+    void HandleReload()
     {
-        if (Input.GetButtonDown("Fire1") && nextFire <= 0 && ammo > 0 && !isReloading)
+        if (Input.GetKeyDown(KeyCode.R) && !isReloading && mag > 0)
         {
-            nextFire = fireRate;
-            ammo--;
-            magText.text = mag.ToString();
-            ammoText.text = ammo + "/" + magAmmo;
-            animator.SetTrigger(recoilTrigger);
-
-            Fire();
-            Recoil.RecoilFire();
-            weaponRecoil.GunKick(isAiming);
-
-            StartCoroutine(ResetFiringAfterDelay(fireRate));
+            Reload();
         }
-    }
-
-    public void HandleAutomaticFire()
-    {
-        if (Input.GetButton("Fire1") && nextFire <= 0 && ammo > 0 && !isReloading)
-        {
-            nextFire = fireRate;
-            ammo--;
-            magText.text = mag.ToString();
-            ammoText.text = ammo + "/" + magAmmo;
-            animator.SetTrigger(recoilTrigger);
-
-            Fire();
-            Recoil.RecoilFire();
-            weaponRecoil.GunKick(isAiming);
-        }
-
-        if (Input.GetButtonUp("Fire1"))
-        {
-            StopFiring();
-        }
-    }
-
-    public void HandleBurstFire()
-    {
-        if (Input.GetButtonDown("Fire1") && burstCoroutine == null && ammo > 0 && !isReloading)
-        {
-            burstCoroutine = StartCoroutine(FireBurst());
-        }
-    }
-
-    IEnumerator FireBurst()
-    {
-        isFiring = true;
-        int shotsFired = 0;
-
-        while (shotsFired < burstCount && ammo > 0)
-        {
-            nextFire = burstFireRate;
-            ammo--;
-            magText.text = mag.ToString();
-            ammoText.text = ammo + "/" + magAmmo;
-
-            Fire();
-            Recoil.RecoilFire();
-            weaponRecoil.GunKick(isAiming);
-            shotsFired++;
-
-            yield return new WaitForSeconds(burstFireRate);
-        }
-
-        isFiring = false;
-        nextFire = fireRate;
-        burstCoroutine = null;
     }
 
     public void Reload()
@@ -207,7 +204,7 @@ public class Weapon : MonoBehaviour, IWeapon
         if (mag > 0)
         {
             isReloading = true;
-            animator.SetTrigger(reloadTrigger); 
+            animator.SetTrigger(reloadTrigger);
             StartCoroutine(ReloadRoutine(animator.GetCurrentAnimatorStateInfo(0).length));
         }
     }
@@ -218,46 +215,49 @@ public class Weapon : MonoBehaviour, IWeapon
 
         mag--;
         ammo = magAmmo;
-        magText.text = mag.ToString();
-        ammoText.text = ammo + "/" + magAmmo;
+        UpdateWeaponUI();
 
         isReloading = false;
     }
 
     public void Fire()
+{
+    isFiring = true;
+    animator.speed = 1 / fireRate;
+
+    photonSound.PlayShootSFX(shootSFXIndex);
+
+    GameObject flashInstance = Instantiate(muzzleFlash, muzzleTransform.position, muzzleTransform.rotation);
+    Destroy(flashInstance, muzzleFlashDuration);
+
+    // Set up a LayerMask to exclude the player's layer
+    int layerMask = ~LayerMask.GetMask("Player");  // Inverts mask to exclude player layer
+
+    Ray ray = new Ray(camera.transform.position, camera.transform.forward);
+    RaycastHit hit;
+
+    // Perform raycast with the layer mask to avoid hitting the player
+    if (Physics.Raycast(ray, out hit, 100f, layerMask))
     {
-        isFiring = true;
-        animator.speed = 1 / fireRate;
+        PhotonNetwork.Instantiate(hitVFX.name, hit.point, Quaternion.LookRotation(hit.normal));
 
-        photonSound.PlayShootSFX(shootSFXIndex);
+        Health targetHealth = hit.transform.GetComponentInParent<Health>();
+        PhotonView targetPhotonView = hit.transform.GetComponentInParent<PhotonView>();
 
-        GameObject flashInstance = Instantiate(muzzleFlash, muzzleTransform.position, muzzleTransform.rotation);
-        Destroy(flashInstance, muzzleFlashDuration);
-
-        Ray ray = new Ray(camera.transform.position, camera.transform.forward);
-        RaycastHit hit;
-
-        if (Physics.Raycast(ray, out hit, 100f))
+        // Check if hit object has a PhotonView and Health component, and ensure it's not the player
+        if (targetPhotonView != null && targetHealth != null && targetPhotonView != photonView)
         {
-            PhotonNetwork.Instantiate(hitVFX.name, hit.point, Quaternion.identity);
-
-            Health targetHealth = hit.transform.gameObject.GetComponent<Health>();
-            PhotonView targetPhotonView = hit.transform.gameObject.GetComponent<PhotonView>();
-
-            // Only call TakeDamage on other clients if the target has a PhotonView
-            if (targetPhotonView != null)
-            {
-                targetPhotonView.RPC("TakeDamage", RpcTarget.OthersBuffered, damage, PhotonNetwork.LocalPlayer.NickName);
-            }
+            bool isHeadshot = hit.collider.CompareTag("Head");
+            targetPhotonView.RPC("TakeDamage", RpcTarget.AllBuffered, damage, PhotonNetwork.LocalPlayer.NickName, isHeadshot);
         }
     }
+}
 
     public void StopFiring()
     {
         isFiring = false;
         animator.speed = 1;
     }
-    
 
     IEnumerator ResetFiringAfterDelay(float delay)
     {
@@ -272,12 +272,12 @@ public class Weapon : MonoBehaviour, IWeapon
         UpdateFireModeUI();
     }
 
-     public void UpdateFireModeUI()
+    public void UpdateFireModeUI()
     {
         fireModeText.text = currentFireMode.ToString();
     }
 
-     public void UpdateWeaponUI()
+    public void UpdateWeaponUI()
     {
         magText.text = mag.ToString();
         ammoText.text = ammo + "/" + magAmmo;
